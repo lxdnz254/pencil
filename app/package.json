@@ -40,14 +40,14 @@
     "drawing"
   ],
   "dependencies": {
-    "archiver": "^1.0.0",
+    "archiver": "^1.1.0",
     "electron-squirrel-startup": "^1.0.0",
     "less": "~2.7.1",
-    "lodash": "^4.13.1",
-    "moment": "^2.13.0",
+    "lodash": "^4.15.0",
+    "moment": "^2.14.1",
     "nugget": "^2.0.0",
     "q": "^1.4.1",
-    "rimraf": "^2.5.2",
+    "rimraf": "^2.5.4",
     "tmp": "0.0.28",
     "unzip2": "^0.2.5"
   },
