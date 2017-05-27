@@ -9,7 +9,6 @@ PlainTextEditor.prototype.setup = function () {
         thiz.fireChangeEvent();
     }, false);
     this.textarea.addEventListener("keyup", function (event) {
-        console.log("keyup")
         thiz.fireChangeEvent();
     }, false);
 };
@@ -20,7 +19,7 @@ PlainTextEditor.prototype.setValue = function (plainText) {
     } else {
         this.textarea.setAttribute("rows", "1");
     }
-    this.textarea.innerHTML = plainText.value;
+    this.textarea.innerHTML = Dom.htmlEncode(plainText.value);
     this.textarea.value = plainText.value;
 };
 PlainTextEditor.prototype.getValue = function () {

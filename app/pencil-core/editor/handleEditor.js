@@ -92,7 +92,6 @@ HandleEditor.prototype.findHandle = function (element) {
     return handle;
 };
 HandleEditor.prototype.handleMouseDown = function (event) {
-    console.log("mouse down");
 	this.lastMatchedOutlet = null;
     this.currentHandle = this.findHandle(event.originalTarget);
 
@@ -290,7 +289,6 @@ HandleEditor.prototype.handleMoveTo = function (x, y, event) {
         this.lastMatchedOutlet = null;
     }
 
-    console.log("move handle");
 };
 HandleEditor.prototype.getPropertyConstraints = function (handle) {
     if (!this.currentHandle) return {};
@@ -378,7 +376,6 @@ HandleEditor.prototype.setupHandles = function () {
     }
 
     this.invalidateFocusedHandle();
-    console.log("Setup handler");
 };
 
 Pencil.registerEditor(HandleEditor);

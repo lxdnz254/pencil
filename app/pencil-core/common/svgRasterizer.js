@@ -20,6 +20,8 @@ Rasterizer.prototype.getImageDataFromUrl = function (url, callback) {
 };
 
 Rasterizer.ipcBasedBackend = {
+    TIME_OUT: 10000,
+    pendingWorkMap: {},
     init: function () {
         ipcRenderer.send("render-init", {});
     },
@@ -27,7 +29,12 @@ Rasterizer.ipcBasedBackend = {
         var id = Util.newUUID();
 
         ipcRenderer.once(id, function (event, data) {
+            var work = Rasterizer.ipcBasedBackend.pendingWorkMap[id];
+            if (!work) return;
+
             callback(parseLinks ? data : data.url);
+            window.clearTimeout(work.timeoutId);
+            delete Rasterizer.ipcBasedBackend.pendingWorkMap[id];
         });
 
         w = width * scale;
@@ -42,6 +49,20 @@ Rasterizer.ipcBasedBackend = {
 
         var xml = Controller.serializer.serializeToString(svgNode);
         ipcRenderer.send("render-request", {svg: xml, width: w, height: h, scale: 1, id: id, processLinks: parseLinks});
+
+        var work = {};
+        work.timeoutId = window.setTimeout(function () {
+            var work = Rasterizer.ipcBasedBackend.pendingWorkMap[id];
+            if (!work) return;
+            callback("");
+            delete Rasterizer.ipcBasedBackend.pendingWorkMap[id];
+
+            console.log("Rasterizer seems to be crashed, restarting now!!!");
+            ipcRenderer.send("render-restart", {});
+
+        }, Rasterizer.ipcBasedBackend.TIME_OUT);
+
+        Rasterizer.ipcBasedBackend.pendingWorkMap[id] = work;
     }
 };
 Rasterizer.outProcessCanvasBasedBackend = {
@@ -162,7 +183,23 @@ Rasterizer.prototype.rasterizePageToUrl = function (page, callback, scale, parse
     var s = (typeof (scale) == "undefined") ? 1 : scale;
     var f = function () {
         svg.setAttribute("page", page.name);
-        thiz.getBackend().rasterize(svg, page.width, page.height, s, callback, parseLinks);
+        var m = Pencil.controller.getDocumentPageMargin() || 0;
+        var w = page.width;
+        var h = page.height;
+        if (m) {
+            var g = svg.ownerDocument.createElementNS(PencilNamespaces.svg, "g");
+            g.setAttribute("transform", translate(0 - m, 0 - m));
+            while (svg.firstChild) {
+                g.appendChild(svg.removeChild(svg.firstChild));
+            }
+            svg.appendChild(g);
+            
+            w -= 2 * m;
+            h -= 2 * m;
+            svg.setAttribute("width", w);
+            svg.setAttribute("height", h);
+        }
+        thiz.getBackend().rasterize(svg, w, h, s, callback, parseLinks);
     };
 
     if (page.backgroundPage) {
@@ -290,31 +327,19 @@ Rasterizer.prototype.rasterizeSelectionToFile = function (target, filePath, call
 
     var thiz = this;
     var s = (typeof (scale) == "undefined") ? 1 : scale;
-    var canvas = document.createElement("canvas");
-    canvas.setAttribute("width", w * s);
-    canvas.setAttribute("height", h * s);
-    var ctx = canvas.getContext("2d");
+    thiz.getBackend().rasterize(svg, w, h, s, function (data) {
+        var dataURI = data;
 
-    var img = new Image();
-    var url = "data:image/svg+xml;charset=utf-8," + Controller.serializer.serializeToString(svg);
-
-    function saveFile (dataURI) {
         var actualPath = filePath ? filePath : tmp.fileSync().name;
-        var base64Data = dataURI.replace(/^data:image\/png;base64,/, "");
+        const prefix = "data:image/png;base64,";
+        var base64Data = dataURI;
+        if (base64Data.startsWith(prefix)) base64Data = base64Data.substring(prefix.length);
 
-        fs.writeFile(actualPath, base64Data, 'base64', function (err) {
+        var buffer = new Buffer(base64Data, "base64");
+        fs.writeFile(actualPath, buffer, 0, buffer.length, function (err) {
             callback(actualPath, err);
         });
-    };
-
-    img.onload = function () {
-        ctx.scale(s, s);
-        ctx.drawImage(img, 0, 0);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        window.URL.revokeObjectURL(url);
-        saveFile(canvas.toDataURL());
-    };
-    img.src = url;
+    });
 };
 
 Rasterizer.prototype._prepareWindowForRasterization = function(backgroundColor) {

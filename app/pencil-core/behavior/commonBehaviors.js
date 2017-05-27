@@ -37,8 +37,7 @@ Pencil.behaviors.Color = function (color) {
 	    Svg.setStyle(this, "fill", color.toRGBString());
 	    Svg.setStyle(this, "fill-opacity", color.a);
 	} else {
-	    Svg.setStyle(this, "color", color ? color.toRGBString() : null);
-	    Svg.setStyle(this, "opacity", color ? color.a : null);
+	    Svg.setStyle(this, "color", color ? color.toRGBAString() : null);
 	}
 };
 Pencil.behaviors.StrokeColor = function (color) {
@@ -643,11 +642,28 @@ Pencil.behaviors.NPatchDomContent = function (nPatch, dim) {
     this.appendChild(buildNPatchDomFragment(nPatch, dim));
 };
 
-Pencil.behaviors.NPatchDomContentFromImage = function (imageData, dim) {
+Pencil.behaviors.NPatchDomContentFromImage = function (imageData, dim, xAnchorMaps, yAnchorMaps) {
     //sorting
     var xCells = imageData.xCells;
-    if (!xCells || xCells.length == 0) xCells = [{from: 0, to: imageData.w}];
     var yCells = imageData.yCells;
+
+    if ((!xCells || xCells.length == 0) && (!yCells || yCells.length == 0)) {
+        Dom.empty(this);
+
+        this.setAttribute("width", dim.w)
+        this.setAttribute("height", dim.h)
+        this.setAttribute("style", "line-height: 1px;");
+
+        this.appendChild(Dom.newDOMElement({
+            _name: "img",
+            _uri: PencilNamespaces.html,
+            style: new CSS().set("width", dim.w + "px").set("height", dim.h + "px").toString(),
+            src: ImageData.refStringToUrl(imageData.data) || imageData.data
+        }));
+        return;
+    }
+
+    if (!xCells || xCells.length == 0) xCells = [{from: 0, to: imageData.w}];
     if (!yCells || yCells.length == 0) yCells = [{from: 0, to: imageData.h}];
 
     xCells = [].concat(xCells);
@@ -693,7 +709,7 @@ Pencil.behaviors.NPatchDomContentFromImage = function (imageData, dim) {
 
         if (scaleY) {
             if (row == yCells.length - 2) {
-                h = dim.h - (imageData.h - yCell.to) - y;
+                h = dim.h - (imageData.h - yCell.to) - totalH;
             } else {
                 h = Math.floor(h * rY);
             }
@@ -702,13 +718,12 @@ Pencil.behaviors.NPatchDomContentFromImage = function (imageData, dim) {
         var col = 0;
         var x = 0;
         var totalW = 0;
-        console.log("xCells", xCells);
 
         var rowSpec = {
             _name: "div",
             _uri: PencilNamespaces.html,
             totalH: totalH,
-            style: new CSS().set("height", h + "px").set("white-space", "nowrap").set("overflow", "hidden"),
+            style: new CSS().set("height", h + "px").set("white-space", "nowrap").set("overflow", "hidden").set("display", "flex"),
             _children: []
         };
         rowSpecs.push(rowSpec);
@@ -716,10 +731,8 @@ Pencil.behaviors.NPatchDomContentFromImage = function (imageData, dim) {
 
         while (col < xCells.length && x < imageData.w) {
             var xCell = xCells[col];
-            console.log(" >> col", col, "cell", xCell);
             var scaleX = xCell.from <= x; // same as (1)
             var x1 = !scaleX ? xCell.from : xCell.to;
-            console.log(" >> x1", x1);
             if (x > xCell.from) x = xCell.from; // same as (2)
 
             //generate block: x, y, x1 - x, y1 - y, scaleX, scaleY
@@ -728,7 +741,7 @@ Pencil.behaviors.NPatchDomContentFromImage = function (imageData, dim) {
 
             if (scaleX) {
                 if (col == xCells.length - 2) {
-                    w = dim.w - (imageData.w - xCell.to) - x;
+                    w = dim.w - (imageData.w - xCell.to) - totalW;
                 } else {
                     w = Math.floor(w * rX);
                 }
